@@ -19,7 +19,7 @@ f:close()
 
 -- Unit Test --
 
-local  sigma = 1.0e-9
+local  sigma = 1.0e-4 --After update to latest proj9 sigma had to change from 1.0e-9 to 1.0e-4
 local  lon =    -108.1
 local  lat =      39.1
 local  height = 2630.0
