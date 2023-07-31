@@ -38,13 +38,23 @@ RUN cmake /arrow/cpp -DARROW_PARQUET=ON -DARROW_WITH_ZLIB=ON
 RUN make -j8
 RUN make install
 
-# instal proj9 gdal/pdal dependency
+# install proj9 gdal/pdal dependency
 WORKDIR /
 RUN git clone https://github.com/OSGeo/PROJ.git
 RUN mkdir -p /build/proj9
 WORKDIR /build/proj9
 RUN cmake /PROJ -DCMAKE_BUILD_TYPE=Release
 RUN make -j8
+RUN make install
+RUN ldconfig
+
+# install geotiff gdal/pdal dependency
+WORKDIR /
+RUN git clone https://github.com/OSGeo/libgeotiff.git
+RUN mkdir -p /build/geotiff
+WORKDIR /build/geotiff
+RUN cmake /libgeotiff/libgeotiff -DCMAKE_BUILD_TYPE=Release
+RUN make -j4
 RUN make install
 RUN ldconfig
 
@@ -58,17 +68,7 @@ RUN make -j8
 RUN make install
 RUN ldconfig
 
-# install geotiff gdal/pdal dependency
-WORKDIR /
-RUN git clone https://github.com/OSGeo/libgeotiff.git
-RUN mkdir -p /build/geotiff
-WORKDIR /build/geotiff
-RUN /libgeotiff/libgeotiff/configure
-RUN make -j4
-RUN make install
-RUN ldconfig
-
-# install gdal
+# install gdal dependency
 WORKDIR /
 RUN git clone https://github.com/OSGeo/gdal.git
 RUN mkdir -p /build/gdal
@@ -78,7 +78,7 @@ RUN make -j8
 RUN make install
 RUN ldconfig
 
-# install pdal
+# install pdal dependency
 WORKDIR /
 RUN git clone https://github.com/PDAL/PDAL.git
 RUN mkdir -p /build/pdal
