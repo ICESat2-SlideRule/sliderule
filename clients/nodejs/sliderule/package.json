@@ -31,7 +31,8 @@
   ],
   "dependencies": {
     "mitt": "^3.0.1",
-    "netrc": "^0.1.4"
+    "netrc": "^0.1.4",
+    "node-fetch": "^3.3.2"
   },
   "bugs": {
     "url": "https://github.com/ICESat2-SlideRule/sliderule/issues"

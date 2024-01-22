@@ -30,6 +30,7 @@
 import https from 'https';
 import netrc from 'netrc';
 import pkg from './package.json' assert { type: 'json' };
+import path from 'path';
 
 //------------------------------------
 // File Data
@@ -250,144 +251,162 @@ async function decodeRecord(rec_type, buffer, offset, rec_size) {
   return rec_obj;
 }
 
-//
-// parseResponse
-//
-function parseResponse(response, resolve, reject, callbacks) {
-  // Check Response Code
-  if (response.statusCode !== 200) {
-    response.resume();
-    reject(new Error(`server returned ${response.statusCode}`));
-  }
-  // Handle Normal Response
-  else if (response.headers['content-type'] == 'application/json' ||
-           response.headers['content-type'] == 'text/plain') {
-    let chunks = [];
-    response.on('data', (chunk) => {
-      chunks.push(chunk);
-    }).on('close', () => {
-      let buffer = Buffer.concat(chunks);
-      let rsps = JSON.parse(buffer);
-      resolve(rsps);
-    });
-  }
-  // Handle Streaming Response
-  else if (response.headers['content-type'] == 'application/octet-stream') {
-    const REC_HDR_SIZE = 8;
-    const REC_VERSION = 2;
-    let results = {};
-    let chunks = [];
-    let total_bytes_read = null;
-    let bytes_read = 0;
-    let bytes_processed = 0;
-    let bytes_to_process = 0;
-    let got_header = false;
-    let rec_size = 0;
-    let rec_type_size = 0;
-    response.on('data', (chunk) => {
-      chunks.push(chunk);
-      bytes_read += chunk.length;
-      bytes_to_process += chunk.length;
-      while (bytes_to_process > 0) {
-        // State: Accumulating Header
-        if (!got_header && bytes_to_process > REC_HDR_SIZE) {
-          // Process header
-          got_header = true;
-          bytes_processed += REC_HDR_SIZE;
-          bytes_to_process -= REC_HDR_SIZE;
-          let buffer = Buffer.concat(chunks);
-          // Get header info
-          let rec_version = buffer.readUInt16BE(0);
-          rec_type_size = buffer.readUInt16BE(2);
-          let rec_data_size = buffer.readUInt32BE(4);
-          if (rec_version != REC_VERSION) {
-            reject(new Error(`invalid record format: ${rec_version}`))
-          }
-          // Set record attributes
-          rec_size = rec_type_size + rec_data_size;
-          chunks = [buffer.subarray(REC_HDR_SIZE)];
+// Use dynamic import based on the environment
+let fetch;
+if (typeof window === 'undefined') {
+    // Node.js environment
+    fetch = (await import('node-fetch')).default;
+} else {
+    // Browser environment
+    fetch = window.fetch;
+}
+
+async function fetchAndProcessStream(url, options, callbacks={}) {
+  try {
+      console.log('url:', url);
+      console.log('options:', options);
+      console.log('callbacks:', callbacks);
+      // Fetch the resource
+      const response = await fetch(url, options);
+      console.log('response:', response);
+      // Check if the response is ok (status in the range 200-299)
+      if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Examine the headers from the response
+      for (const [key, value] of response.headers.entries()) {
+          console.log(`${key}: ${value}`);
+      }
+      const contentType = response.headers.get('content-type');
+
+      // Get the reader from the response stream
+      const reader = response.body.getReader();
+
+      // Process the stream
+      let receivedLength = 0; // length of the received  data
+      let chunks = []; // array to store received  chunks
+      const REC_HDR_SIZE = 8;
+      const REC_VERSION = 2;
+      let results = {};
+      let total_bytes_read = null;
+      let bytes_read = 0;
+      let bytes_processed = 0;
+      let bytes_to_process = 0;
+      let got_header = false;
+      let rec_size = 0;
+      let rec_type_size = 0;
+
+      while (true) {
+        const { done, chunk } = await reader.read();
+
+        if (done) {
+            // The stream has been read completely
+            total_bytes_read = bytes_read;
+            results["bytes_read"] = total_bytes_read;
+            results["bytes_processed"] = bytes_processed;
+            if (contentType == 'application/octet-stream') {
+              results["bytes_read"] = total_bytes_read;
+              results["bytes_processed"] = bytes_processed;
+            } else if (contentType == 'application/json' || contentType == 'text/plain') {
+            }
+            break;
         }
-        // State: Accumulating Record
-        else if (got_header && bytes_to_process >= rec_size) {
-          // Process record
-          got_header = false;
-          bytes_to_process -= rec_size;
-          bytes_processed += rec_size;
-          let buffer = Buffer.concat(chunks);
-          let rec_type = buffer.toString('utf8', 0, rec_type_size - 1);
-          decodeRecord(rec_type, buffer, rec_type_size, rec_size).then(
-            result => {
-              if (rec_type in callbacks) {
-                callbacks[rec_type](result);
+        console.log('done:', done);
+        console.log('chunk:', chunk);
+        console.log(`Received ${chunk.length} bytes of data`);
+        chunks.push(chunk);
+        receivedLength += chunk.length;
+
+        if (contentType == 'application/octet-stream') {
+          bytes_read += chunk.length;
+          bytes_to_process += chunk.length;
+          while (bytes_to_process > 0) {
+            // State: Accumulating Header
+            if (!got_header && bytes_to_process > REC_HDR_SIZE) {
+              // Process header
+              got_header = true;
+              bytes_processed += REC_HDR_SIZE;
+              bytes_to_process -= REC_HDR_SIZE;
+              let buffer = Buffer.concat(chunks);
+              // Get header info
+              let rec_version = buffer.readUInt16BE(0);
+              rec_type_size = buffer.readUInt16BE(2);
+              let rec_data_size = buffer.readUInt32BE(4);
+              if (rec_version != REC_VERSION) {
+                reject(new Error(`invalid record format: ${rec_version}`))
+              }
+              // Set record attributes
+              rec_size = rec_type_size + rec_data_size;
+              chunks = [buffer.subarray(REC_HDR_SIZE)];
+            }
+            // State: Accumulating Record
+            else if (got_header && bytes_to_process >= rec_size) {
+              // Process record
+              got_header = false;
+              bytes_to_process -= rec_size;
+              bytes_processed += rec_size;
+              let buffer = Buffer.concat(chunks);
+              let rec_type = buffer.toString('utf8', 0, rec_type_size - 1);
+              decodeRecord(rec_type, buffer, rec_type_size, rec_size).then(
+                result => {
+                  if (rec_type in callbacks) {
+                    callbacks[rec_type](result);
+                  }
+                }
+              );
+              // Update stats
+              if (!(rec_type in results)) {
+                results[rec_type] = 0;
+              }
+              results[rec_type]++;
+              // Check if complete
+              if ((total_bytes_read != null) && (bytes_processed == total_bytes_read)) {
+                results["bytes_processed"] = bytes_processed;
+                resolve(results);
+              }
+              // Restore unused bytes that have been read
+              if(bytes_to_process > 0) {
+                chunks = [buffer.subarray(rec_size)];
+              }
+              else {
+                chunks = [];
               }
             }
-          );
-          // Update stats
-          if (!(rec_type in results)) {
-            results[rec_type] = 0;
+            // State: Need More Data
+            else {
+              break;
+            }
           }
-          results[rec_type]++;
-          // Check if complete
-          if ((total_bytes_read != null) && (bytes_processed == total_bytes_read)) {
-            results["bytes_processed"] = bytes_processed;
-            resolve(results);
-          }
-          // Restore unused bytes that have been read
-          if(bytes_to_process > 0) {
-            chunks = [buffer.subarray(rec_size)];
-          }
-          else {
-            chunks = [];
-          }
-        }
-        // State: Need More Data
-        else {
-          break;
-        }
+        }  
       }
-    }).on('close', () => {
-      // Establish total bytes read
-      total_bytes_read = bytes_read;
-      results["bytes_read"] = total_bytes_read;
-      // Check if complete
-      if (bytes_processed == total_bytes_read) {
-        results["bytes_processed"] = bytes_processed;
-        resolve(results);
+      if (contentType == 'application/octet-stream') {
+
+        // Combine chunks into a single Uint8Array
+        let binaryData = new Uint8Array(receivedLength);
+        let position = 0;
+        for (let chunk of chunks) {
+            binaryData.set(chunk, position);
+            position += chunk.length;
+        }
+        return binaryData;
+
+      } else if (contentType == 'application/json' || contentType == 'text/plain') {
+        let buffer = Buffer.concat(chunks);
+        let jsonData = JSON.parse(buffer);
+        return jsonData;
       }
-    });
+  } catch (error) {
+      // Handle any errors
+      console.error('Error fetching or processing stream:', error);
+      throw error; // Re-throw the error if you want to handle it further up the call stack
   }
 }
 
-//
-// httpRequest
-//
-async function httpRequest(options, body, callbacks) {
-  let attempts = 3;
-  while (--attempts > 0) {
-    let response = new Promise((resolve, reject) => {
-      // On Response
-      let request = sysConfig.protocol.request(options, (response) =>
-        parseResponse(response, resolve, reject, callbacks)
-      );
-      // On Errors
-      request.on('error', (err) => {
-        reject(new Error(`failed to make request: ${err.message}`));
-      });
-      // Populate Body of Request (if provided)
-      if (body != null) {
-        request.write(body);
-      }
-      // Terminate Request
-      request.end();
-    });
-    try {
-      return await response;
-    }
-    catch (error) {
-      console.log(`retrying http request: ${error}`);
-    }
-  }
-};
+// Example usage
+// fetchAndProcessStream('https://example.com/some-binary-data')
+//   .then(data => console.log('Received binary data:', data))
+//   .catch(error => console.error('Failed to fetch or process stream:', error));
 
 //------------------------------------
 // Exported Functions
@@ -403,79 +422,103 @@ export function init(config) {
 //
 // Source Endpoint
 //
+// export function source(api, parm=null, stream=false, callbacks={}) {
+//   // Setup Request Options
+//   const options = {
+//     host: sysConfig.organization && (sysConfig.organization + '.' + sysConfig.domain) || sysConfig.domain,
+//     path: '/source/' + api,
+//     method: stream && 'POST' || 'GET',
+//   };
+//   // Build Body
+//   let body = null;
+//   if (parm != null) {
+//     body = JSON.stringify(parm);
+//     options["headers"] = {'Content-Type': 'application/json', 'Content-Length': body.length};
+//   }
+//   // Make API Request
+//   return httpRequest(options, body, callbacks);
+// }
 export function source(api, parm=null, stream=false, callbacks={}) {
-
+  const host = sysConfig.organization && (sysConfig.organization + '.' + sysConfig.domain) || sysConfig.domain;
+  //console.log('host: ', host);
+  //console.log('sysConfig: ', sysConfig);
+  //console.log('sysConfig.organization: ', sysConfig.organization);
+  const api_path = path.join('source', api);
+  //console.log('api_path: ', api_path);
+  console.log('parm: ', parm);
+  const url = 'https://' + host + '/' + api_path;
+  console.log('url: ', url);
   // Setup Request Options
-  const options = {
-    host: sysConfig.organization && (sysConfig.organization + '.' + sysConfig.domain) || sysConfig.domain,
-    path: '/source/' + api,
-    method: stream && 'POST' || 'GET',
+  // When stream is true, options.method will be 'POST'.
+  // When stream is false, options.method will be 'GET'.
+  let options = {
+    method: stream ? 'POST' : 'GET',
   };
 
-  // Build Body
   let body = null;
   if (parm != null) {
     body = JSON.stringify(parm);
-    options["headers"] = {'Content-Type': 'application/json', 'Content-Length': body.length};
+    options.headers = {
+      'Content-Type': 'application/json', 
+      'Content-Length': Buffer.byteLength(body)
+    };
+    options.body = body;
   }
-
+  console.log('options: ', options);
   // Make API Request
-  return httpRequest(options, body, callbacks);
+  //return fetchRequest(url, options, body, callbacks);
+  return fetchAndProcessStream(url, options, callbacks);
 }
+
 
 //
 // Authenticate User
 //
-export function authenticate(ps_username=null, ps_password=null) {
+// export function authenticate(ps_username=null, ps_password=null) {
+//     // Build Provisioning System URL
+//     let psHost = 'ps.' + sysConfig.domain;
+//     // Obtain Username and Password
+//     ps_username = ps_username ?? process.env.PS_USERNAME;
+//     ps_password = ps_password ?? process.env.PS_PASSWORD;
+//     if (ps_username == null || ps_password == null) {
+//       let myNetrc = netrc();
+//       if (psHost in myNetrc) {
+//         ps_username = myNetrc[psHost].login;
+//         ps_password = myNetrc[psHost].password;
+//       }
+//     }
+//     // Bail If Username and Password Not Found
+//     if(!ps_username && !ps_password) {
+//       console.error(`Unable to obtain username and/or password for ${psHost}`);
+//       return Promise.resolve();
+//     }
+//     // Build Request Body
+//     let body = JSON.stringify({username: ps_username, password: ps_password, org_name: sysConfig.organization});
+//     // Setup Request Options
+//     const options = {
+//       host: psHost,
+//       path: '/api/org_token/',
+//       method: 'POST',
+//       headers: {'Content-Type': 'application/json', 'Content-Length': body.length},
+//     };
 
-    // Build Provisioning System URL
-    let psHost = 'ps.' + sysConfig.domain;
-
-    // Obtain Username and Password
-    ps_username = ps_username ?? process.env.PS_USERNAME;
-    ps_password = ps_password ?? process.env.PS_PASSWORD;
-    if (ps_username == null || ps_password == null) {
-      let myNetrc = netrc();
-      if (psHost in myNetrc) {
-        ps_username = myNetrc[psHost].login;
-        ps_password = myNetrc[psHost].password;
-      }
-    }
-
-    // Bail If Username and Password Not Found
-    if(!ps_username && !ps_password) {
-      console.error(`Unable to obtain username and/or password for ${psHost}`);
-      return Promise.resolve();
-    }
-
-    // Build Request Body
-    let body = JSON.stringify({username: ps_username, password: ps_password, org_name: sysConfig.organization});
-
-    // Setup Request Options
-    const options = {
-      host: psHost,
-      path: '/api/org_token/',
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Content-Length': body.length},
-    };
-
-    // Make Authentication Request
-    return httpRequest(options, body).then(
-      result => {
-        let expiration = 0;
-        try {
-          sysCredentials.access = result.access;
-          sysCredentials.refresh = result.refresh;
-          sysCredentials.expiration =  (Date.now() / 1000) + (result.access_lifetime / 2);
-          expiration = sysCredentials.expiration;
-        }
-        catch (e) {
-          console.error("Error processing authentication response\n", result);
-        }
-        return expiration;
-      }
-    );
-}
+//     // Make Authentication Request
+//     return httpRequest(options, body).then(
+//       result => {
+//         let expiration = 0;
+//         try {
+//           sysCredentials.access = result.access;
+//           sysCredentials.refresh = result.refresh;
+//           sysCredentials.expiration =  (Date.now() / 1000) + (result.access_lifetime / 2);
+//           expiration = sysCredentials.expiration;
+//         }
+//         catch (e) {
+//           console.error("Error processing authentication response\n", result);
+//         }
+//         return expiration;
+//       }
+//     );
+// }
 
 //
 // Get Version
