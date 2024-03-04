@@ -112,10 +112,17 @@ MeritRaster::MeritRaster(lua_State *L, GeoParms* _parms):
 /*----------------------------------------------------------------------------
  * getSamples
  *----------------------------------------------------------------------------*/
-uint32_t MeritRaster::getSamples (OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, void* param)
+uint32_t MeritRaster::getSamples (OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, bool dryrun, void* param)
 {
     (void)param;
     (void)gps;
+
+    if(dryrun)
+    {
+        RasterSample* sample = new RasterSample(((double)gpsTime / (double)1000.0), 0);
+        slist.push_back(sample);
+        return SS_NO_ERRORS;
+    }
 
     OGRPoint* poi = geo->toPoint();
 

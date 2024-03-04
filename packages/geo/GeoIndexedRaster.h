@@ -100,7 +100,7 @@ class GeoIndexedRaster: public RasterObject
 
         static void     init              (void);
         static void     deinit            (void);
-        uint32_t        getSamples        (OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, void* param=NULL) final;
+        uint32_t        getSamples        (OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, bool dryrun=false, void* param=NULL) final;
         uint32_t        getSubsets        (OGRGeometry* geo, int64_t gps, std::vector<RasterSubset*>& slist, void* param=NULL) final;
         virtual        ~GeoIndexedRaster  (void);
 
@@ -161,6 +161,8 @@ class GeoIndexedRaster: public RasterObject
         GdalRaster::bbox_t        bbox;
         uint32_t                  rows;
         uint32_t                  cols;
+
+        std::atomic_bool          dryrun;
 
         /*--------------------------------------------------------------------
          * Methods

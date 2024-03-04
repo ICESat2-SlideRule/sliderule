@@ -104,7 +104,7 @@ class GdalRaster
                            GdalRaster     (GeoParms* _parms, const std::string& _fileName, double _gpsTime, uint64_t _fileId, bool _dataIsElevation, overrideCRS_t cb);
         virtual           ~GdalRaster     (void);
         void               open           (void);
-        RasterSample*      samplePOI      (OGRPoint* poi);
+        RasterSample*      samplePOI      (OGRPoint* poi, bool dryrun);
         RasterSubset*      subsetAOI      (OGRPolygon* poly);
         RasterSubset*      subsetAOI      (uint32_t ulx, uint32_t uly, uint32_t _xsize, uint32_t _ysize);
         const std::string& getFileName    (void) const { return fileName;}

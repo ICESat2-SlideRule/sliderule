@@ -126,6 +126,48 @@ for i = 1, #demTypes do
     end
 end
 
+
+expSamplesCnt = {8, 8, 4, 14}
+
+for i = 1, #demTypes do
+
+    local demType = demTypes[i];
+    print(string.format("\n--------------------------------\nTest: %s sampling dryrun\n--------------------------------", demType))
+    local dem = geo.raster(geo.parms({ asset = demType, algorithm = "NearestNeighbour"}))
+
+    for j, lon in ipairs(lons) do
+        local sampleCnt = 0
+        lat = lats[j]
+        tbl, err = dem:sample(lon, lat, height, "", true)
+        if err ~= 0 then
+            print(string.format("Point: %d, (%.3f, %.3f) ======> FAILED to read",j, lon, lat))
+        else
+            local el, fname
+            for k, v in ipairs(tbl) do
+                el = v["value"]
+                fname = v["file"]
+                print(string.format("(%02d)   (%6.1f, %5.1f) %16.9fm   %s", k, lon, lat, el, fname))
+                sampleCnt = sampleCnt + 1
+
+                -- on dryrun all elevation should be 0.0
+                runner.check(el == 0.0)
+
+                -- on dryrun all file names should start with:
+                runner.check(string.sub(fname, 1, 34) == "/vsis3/pgc-opendata-dems/arcticdem")
+            end
+        end
+
+        if demType == "arcticdem-mosaic" then
+            expectedSamplesCnt = 1
+        else
+            expectedSamplesCnt = expSamplesCnt[j]
+            print("\n")
+        end
+        -- print(string.format("(%02d) value: %d  exp: %d", i, sampleCnt, expectedSamplesCnt))
+        runner.check(sampleCnt == expectedSamplesCnt)
+    end
+end
+
 -- Report Results --
 
 runner.report()

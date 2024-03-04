@@ -103,11 +103,12 @@ void GeoIndexedRaster::deinit (void)
 /*----------------------------------------------------------------------------
  * getSamples
  *----------------------------------------------------------------------------*/
-uint32_t GeoIndexedRaster::getSamples(OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, void* param)
+uint32_t GeoIndexedRaster::getSamples(OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, bool _dryrun, void* param)
 {
     std::ignore = param;
 
     samplingMutex.lock();
+    dryrun = _dryrun;
     try
     {
         ssError = SS_NO_ERRORS;
@@ -152,6 +153,8 @@ uint32_t GeoIndexedRaster::getSamples(OGRGeometry* geo, int64_t gps, std::vector
         }
         key = cache.next(&item);
     }
+
+    dryrun = false;  /* Reset dryrun flag */
     samplingMutex.unlock();
 
     return ssError;
@@ -212,7 +215,8 @@ GeoIndexedRaster::GeoIndexedRaster(lua_State *L, GeoParms* _parms, GdalRaster::o
     crscb        (cb),
     bbox         {0, 0, 0, 0},
     rows         (0),
-    cols         (0)
+    cols         (0),
+    dryrun       (false)
 {
     /* Add Lua Functions */
     LuaEngine::setAttrFunc(L, "dim", luaDimensions);
@@ -627,7 +631,7 @@ void* GeoIndexedRaster::readingThread(void *param)
         if(entry != NULL)
         {
             if(GdalRaster::ispoint(reader->geo))
-                entry->sample = entry->raster->samplePOI((OGRPoint*)reader->geo);
+                entry->sample = entry->raster->samplePOI((OGRPoint*)reader->geo, reader->obj->dryrun);
             else if(GdalRaster::ispoly(reader->geo))
                 entry->subset = entry->raster->subsetAOI((OGRPolygon*)reader->geo);
             entry->enabled = false; /* raster samples/subsetted */

@@ -190,7 +190,7 @@ uint64_t RasterObject::fileDictAdd(const std::string& fileName)
 }
 
 /*----------------------------------------------------------------------------
- * luaSamples - :sample(lon, lat, [height], [gps]) --> in|out
+ * luaSamples - :sample(lon, lat, [height], [gps], [dryrun]) --> in|out
  *----------------------------------------------------------------------------*/
 int RasterObject::luaSamples(lua_State *L)
 {
@@ -210,10 +210,11 @@ int RasterObject::luaSamples(lua_State *L)
         double lat    = getLuaFloat(L, 3);
         double height = getLuaFloat(L, 4, true, 0.0);
         const char* closest_time_str = getLuaString(L, 5, true, NULL);
+        bool   dryrun = getLuaBoolean(L, 6, true, false);
 
         /* Get gps closest time (overrides params provided closest time) */
         int64_t gps = 0;
-        if(closest_time_str != NULL)
+        if(closest_time_str != NULL && strlen(closest_time_str) > 0)
         {
             gps = TimeLib::str2gpstime(closest_time_str);
         }
@@ -221,7 +222,7 @@ int RasterObject::luaSamples(lua_State *L)
         /* Get samples */
         bool listvalid = true;
         OGRPoint poi(lon, lat, height);
-        err = lua_obj->getSamples(&poi, gps, slist, NULL);
+        err = lua_obj->getSamples(&poi, gps, slist, dryrun, NULL);
 
         if(err & SS_THREADS_LIMIT_ERROR)
         {

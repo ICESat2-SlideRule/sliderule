@@ -42,7 +42,7 @@
 /*----------------------------------------------------------------------------
  * getSamples
  *----------------------------------------------------------------------------*/
-uint32_t GeoRaster::getSamples(OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, void* param)
+uint32_t GeoRaster::getSamples(OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, bool dryrun, void* param)
 {
     std::ignore = gps;
     std::ignore = param;
@@ -50,7 +50,7 @@ uint32_t GeoRaster::getSamples(OGRGeometry* geo, int64_t gps, std::vector<Raster
     samplingMutex.lock();
     try
     {
-        RasterSample* sample = raster.samplePOI(geo->toPoint());
+        RasterSample* sample = raster.samplePOI(geo->toPoint(), dryrun);
         if(sample) slist.push_back(sample);
     }
     catch (const RunTimeException &e)

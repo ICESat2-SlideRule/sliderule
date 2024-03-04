@@ -78,7 +78,7 @@ class MeritRaster: public RasterObject
          *--------------------------------------------------------------------*/
 
                  MeritRaster (lua_State *L, GeoParms* _parms);
-        uint32_t getSamples (OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, void* param=NULL) final;
+        uint32_t getSamples (OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, bool dryrun=false, void* param=NULL) final;
         uint32_t getSubsets (OGRGeometry* geo, int64_t gps, std::vector<RasterSubset*>& slist, void* param=NULL) final;
     private:
 

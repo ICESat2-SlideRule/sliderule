@@ -141,12 +141,18 @@ void GdalRaster::open(void)
 /*----------------------------------------------------------------------------
  * samplePOI
  *----------------------------------------------------------------------------*/
-RasterSample* GdalRaster::samplePOI(OGRPoint* poi)
+RasterSample* GdalRaster::samplePOI(OGRPoint* poi, bool dryrun)
 {
     RasterSample* sample = NULL;
 
     /* Clear sample/subset error status */
     ssError = SS_NO_ERRORS;
+
+    if(dryrun)
+    {
+        sample = new RasterSample(gpsTime, fileId, 0);
+        return sample;
+    }
 
     try
     {
