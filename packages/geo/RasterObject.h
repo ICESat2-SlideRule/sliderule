@@ -98,11 +98,12 @@ class RasterObject: public LuaObject
          * Methods
          *--------------------------------------------------------------------*/
 
-                    RasterObject    (lua_State* L, GeoParms* _parms);
-        uint64_t    fileDictAdd     (const std::string& fileName);
-        static int  luaSamples      (lua_State* L);
-        static int  luaSubset       (lua_State* L);
-        static int  luaPixels       (lua_State *L);
+                    RasterObject     (lua_State* L, GeoParms* _parms);
+        uint64_t    fileDictAdd      (const std::string& fileName);
+        static int  luaSamples       (lua_State* L);
+        static int  luaSubset        (lua_State* L);
+        static int  luaPixels        (lua_State *L);
+        static int  luaParquetSamples(lua_State* L);
 
         /*--------------------------------------------------------------------
          * Data
