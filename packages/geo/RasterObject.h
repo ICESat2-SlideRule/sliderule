@@ -78,6 +78,7 @@ class RasterObject: public LuaObject
         static int       luaCreate       (lua_State* L);
         static bool      registerRaster  (const char* _name, factory_f create);
         virtual uint32_t getSamples      (OGRGeometry* geo, int64_t gps, std::vector<RasterSample*>& slist, void* param=NULL) = 0;
+        uint32_t         getSamples      (const std::string& in_file, const std::string& out_file, const std::string& prefix, const int64_t gps, void* param=NULL);
         virtual uint32_t getSubsets      (OGRGeometry* geo, int64_t gps, std::vector<RasterSubset*>& slist, void* param=NULL) = 0;
         virtual uint32_t getPixels       (uint32_t ulx, uint32_t uly, uint32_t xsize, uint32_t ysize, std::vector<RasterSubset*>& slist, void* param=NULL);
         virtual         ~RasterObject    (void);
