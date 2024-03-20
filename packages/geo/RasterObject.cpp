@@ -254,7 +254,7 @@ OGRPoint ConvertWKBToPoint(const std::string& wkb_data)
         point.y = swap_double(point.y);
     }
 
-    OGRPoint poi(point.x, point.y);
+    OGRPoint poi(point.x, point.y, 0);
     return poi;
 }
 
