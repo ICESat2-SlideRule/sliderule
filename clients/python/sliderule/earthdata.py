@@ -472,6 +472,25 @@ def __stac_search(provider, short_name, collections, polygons, time_start, time_
     return geojson
 
 #
+# Get Version from DATASETS
+#
+def __get_version(short_name):
+
+    # check parameters
+    if short_name == None:
+        raise sliderule.FatalError("Must supply short name to CMR query")
+    elif short_name not in DATASETS:
+        raise sliderule.FatalError("Must supply a supported dataset: " + short_name)
+
+    # attempt to fill in version
+    version = DATASETS[short_name]["version"]
+    if version == None:
+        raise sliderule.FatalError("Unable to determine version for CMR query")
+
+    # return version string (cannot be None)
+    return version
+
+#
 # Get Provider from DATASETS
 #
 def __get_provider(short_name):

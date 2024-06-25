@@ -262,7 +262,7 @@ def attributes_encoder(attr):
     if isinstance(attr, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32,
         np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
         return int(attr)
-    elif isinstance(attr, (np.float_, np.float16, np.float32, np.float64)):
+    elif isinstance(attr, (np.float16, np.float32, np.float64)):
         return float(attr)
     elif isinstance(attr, (np.ndarray)):
         return attr.tolist()
@@ -482,8 +482,10 @@ def to_parquet(gdf, filename, **kwargs):
     )
     # output metadata
     output = {}
+    # remove request polygon from output parameters
+    if 'poly' in kwargs['parameters']:
+        kwargs['parameters'].pop('poly')
     # for each adjustable sliderule parameter
-    [kwargs['parameters'].pop(p) for p in ['poly']]
     for p,val in kwargs['parameters'].items():
         # try to convert the parameter if available
         try:
@@ -492,7 +494,7 @@ def to_parquet(gdf, filename, **kwargs):
             pass
     # save CRS to JSON
     crs = pyproj.CRS.from_string(kwargs['crs'])
-    output['crs'] = crs.to_string()
+    output['crs'] = crs.to_json_dict()
     # save each region following GeoJSON specification
     output['type'] = 'FeatureCollection'
     output['features'] = []

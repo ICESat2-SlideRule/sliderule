@@ -2026,17 +2026,17 @@ class leaflet:
             # keep track of cursor position
             self.map.on_interaction(self.handle_interaction)
         # add control for drawing polygons or bounding boxes
-        draw_control = ipyleaflet.DrawControl(polyline={},circlemarker={},
+        self.draw_control = ipyleaflet.DrawControl(polyline={},circlemarker={},
             edit=False)
         shapeOptions = {'color':kwargs['color'],'fill_color':kwargs['color']}
-        draw_control.rectangle = dict(shapeOptions=shapeOptions,
+        self.draw_control.rectangle = dict(shapeOptions=shapeOptions,
             metric=['km','m'])
-        draw_control.polygon = dict(shapeOptions=shapeOptions,
+        self.draw_control.polygon = dict(shapeOptions=shapeOptions,
             allowIntersection=False, showArea=True, metric=['km','m'])
         # create regions
         self.regions = []
-        draw_control.on_draw(self.handle_draw)
-        self.map.add(draw_control)
+        self.draw_control.on_draw(self.handle_draw)
+        self.map.add(self.draw_control)
         # initialize data and colorbars
         self.geojson = None
         self.tooltip = None
@@ -2949,22 +2949,22 @@ class ICESat2:
                 if (cycle < kwargs['cycle_start']):
                     continue
                 # reduce data frame to RGT, ground track and cycle
-                atl06 = self._gdf[
+                gdf = self._gdf[
                     (self._gdf['rgt'] == RGT) &
                     (self._gdf['gt'] == GT) &
                     (self._gdf['cycle'] == cycle)]
-                if not any(atl06[column].values):
+                if not any(gdf[column].values):
                     continue
                 # set index to along-track distance
-                atl06['x_atc'] -= kwargs['x_offset']
-                atl06.set_index('x_atc', inplace=True)
+                gdf['x_atc'] -= kwargs['x_offset']
+                gdf.set_index('x_atc', inplace=True)
                 # plot reduced data frame
-                l, = ax.plot(atl06.index.values,
-                    atl06[column].values,
+                l, = ax.plot(gdf.index.values,
+                    gdf[column].values,
                     marker='.', lw=0, ms=1.5)
                 # create legend element for cycle
                 if (kwargs['legend_label'] == 'date'):
-                    label = atl06.index[0].strftime('%Y-%m-%d')
+                    label = gdf.index[0].strftime('%Y-%m-%d')
                 elif (kwargs['legend_label'] == 'cycle'):
                     label = f'Cycle {cycle:0.0f}'
                 # append handle to legend
@@ -2977,76 +2977,77 @@ class ICESat2:
         elif (kwargs['kind'] == 'scatter'):
             # extract orbital cycle parameters
             cycle = int(kwargs['cycle'])
-            if (kwargs['data_type'] == 'atl03'):
+            data_type = kwargs['data_type']
+            if (data_type == 'atl03'):
                 # reduce entered data frame to RGT, ground track and cycle
-                atl03 = self._gdf[(self._gdf['rgt'] == RGT) &
+                gdf = self._gdf[(self._gdf['rgt'] == RGT) &
                     (self._gdf['track'] == self.PT(GT)) &
                     (self._gdf['pair'] == self.LR(GT)) &
                     (self._gdf['cycle'] == cycle)]
                 # set index to along-track distance
-                atl03['segment_dist'] += atl03['x_atc']
-                atl03['segment_dist'] -= kwargs['x_offset']
-                atl03.set_index('segment_dist', inplace=True)
-            if (kwargs['data_type'] == 'atl03') and (kwargs['classification'] == 'atl08'):
+                gdf['segment_dist'] += gdf['x_atc']
+                gdf['segment_dist'] -= kwargs['x_offset']
+                gdf.set_index('segment_dist', inplace=True)
+            if (data_type == 'atl03') and (kwargs['classification'] == 'atl08'):
                 # noise, ground, canopy, top of canopy, unclassified
                 colormap = np.array(['c','b','limegreen','g','y'])
                 classes = ['noise','ground','canopy','top of canopy','unclassified']
-                sc = ax.scatter(atl03.index.values, atl03["height"].values,
-                    c=colormap[atl03["atl08_class"].values.astype('i')],
+                sc = ax.scatter(gdf.index.values, gdf[column].values,
+                    c=colormap[gdf["atl08_class"].values.astype('i')],
                     s=1.5, rasterized=True)
                 # append handles to legend
                 for i,lab in enumerate(classes):
                     handle = matplotlib.lines.Line2D([0], [0],
                         color=colormap[i], lw=6, label=lab)
                     legend_handles.append(handle)
-            elif (kwargs['data_type'] == 'atl03') and (kwargs['classification'] == 'yapc'):
-                sc = ax.scatter(atl03.index.values,
-                    atl03["height"].values,
-                    c=atl03["yapc_score"],
+            elif (data_type == 'atl03') and (kwargs['classification'] == 'yapc'):
+                sc = ax.scatter(gdf.index.values,
+                    gdf[column].values,
+                    c=gdf["yapc_score"],
                     cmap=kwargs['cmap'],
                     s=1.5, rasterized=True)
                 plt.colorbar(sc)
-            elif (kwargs['data_type'] == 'atl03') and (kwargs['classification'] == 'atl03'):
+            elif (data_type == 'atl03') and (kwargs['classification'] == 'atl03'):
                 # background, buffer, low, medium, high
                 colormap = np.array(['y','c','b','g','m'])
                 confidences = ['background','buffer','low','medium','high']
                 # reduce data frame to photon classified for surface
-                atl03 = atl03[atl03["atl03_cnf"] >= 0]
-                sc = ax.scatter(atl03.index.values, atl03["height"].values,
-                    c=colormap[atl03["atl03_cnf"].values.astype('i')],
+                gdf = gdf[gdf["atl03_cnf"] >= 0]
+                sc = ax.scatter(gdf.index.values, gdf[column].values,
+                    c=colormap[gdf["atl03_cnf"].values.astype('i')],
                     s=1.5, rasterized=True)
                 # append handles to legend
                 for i,lab in enumerate(confidences):
                     handle = matplotlib.lines.Line2D([0], [0],
                         color=colormap[i], lw=6, label=lab)
                     legend_handles.append(handle)
-            elif (kwargs['data_type'] == 'atl03'):
+            elif (data_type == 'atl03'):
                 # plot all available ATL03 points as gray
-                sc = ax.scatter(atl03.index.values, atl03["height"].values,
+                sc = ax.scatter(gdf.index.values, gdf[column].values,
                     c='0.4', s=0.5, rasterized=True)
                 # append handle to legend
                 handle = matplotlib.lines.Line2D([0], [0],
                     color='0.4', lw=6, label='ATL03')
                 legend_handles.append(handle)
-            # plot ATL06-SR segments for cycle and track
-            if (kwargs['data_type'] == 'atl06'):
-                atl06 = self._gdf[
+            # plot ATL06-SR or ATL08-SR segments for cycle and track
+            if data_type in ('atl06','atl08'):
+                gdf = self._gdf[
                     (self._gdf['rgt'] == RGT) &
                     (self._gdf['gt'] == GT) &
                     (self._gdf['cycle'] == cycle)]
                 # set index to along-track distance
-                atl06['x_atc'] -= kwargs['x_offset']
-                atl06.set_index('x_atc', inplace=True)
+                gdf['x_atc'] -= kwargs['x_offset']
+                gdf.set_index('x_atc', inplace=True)
                 # plot reduced data frame
-                sc = ax.scatter(atl06.index.values,
-                    atl06["h_mean"].values,
+                sc = ax.scatter(gdf.index.values,
+                    gdf[column].values,
                     c='red', s=2.5, rasterized=True)
                 handle = matplotlib.lines.Line2D([0], [0],
-                    color='red', lw=6, label='ATL06-SR')
+                    color='red', lw=6, label=f'{data_type.upper()}-SR')
                 legend_handles.append(handle)
             # add axes labels
             ax.set_xlabel('Along-Track Distance [m]')
-            ax.set_ylabel('Height (m)')
+            ax.set_ylabel(f'SlideRule {column}')
         # add title
         if kwargs['title']:
             ax.set_title(kwargs['title'])
